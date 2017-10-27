@@ -218,7 +218,6 @@ var RESERVED_PROPERTIES: string[] = [
   'read',
   'write',
   '$definedComponents',
-  'dispatchEvent',
 
 
   /**
@@ -292,6 +291,7 @@ var RESERVED_PROPERTIES: string[] = [
   'didTimeout',
   'disconnect',
   'disconnectedCallback',
+  'dispatchEvent',
   'document',
   'documentElement',
   'error',
