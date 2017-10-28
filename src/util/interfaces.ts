@@ -320,47 +320,45 @@ export interface CompiledModeStyles {
 }
 
 
-export interface CoreBuildConditionals {
-  coreId?: string;
+export interface BuildConditionals {
+  coreId?: 'core' | 'core.ssr' | 'core.pf';
   fileName?: string;
   polyfills?: boolean;
 
-  _build_es2015?: boolean;
-  _build_es5?: boolean;
-  _build_verbose_error?: boolean;
-  _build_custom_slot?: boolean;
+  es2015: boolean;
+  es5: boolean;
+  verboseError: boolean;
+  customSlot: boolean;
 
-  _build_ssr_parser?: boolean;
-  _build_ssr_serializer?: boolean;
+  ssrClientSide: boolean;
+  ssrServerSide: boolean;
 
-  _build_styles?: boolean;
-  _build_scoped_css?: boolean;
-  _build_shadow_dom?: boolean;
+  styles: boolean;
+  scopedCss: boolean;
+  shadowDom: boolean;
 
-  _build_render?: boolean;
-  _build_host_render?: boolean;
-  _build_svg_render?: boolean;
+  render: boolean;
+  hostData: boolean;
+  hostTheme: boolean;
+  svg: boolean;
+  observeAttr: boolean;
 
   // decorators
-  _build_element?: boolean;
-  _build_event?: boolean;
-  _build_listener?: boolean;
-  _build_method?: boolean;
-  _build_observe_attr?: boolean;
-  _build_prop?: boolean;
-  _build_prop_connect?: boolean;
-  _build_prop_context?: boolean;
-  _build_prop_did_change?: boolean;
-  _build_prop_will_change?: boolean;
-  _build_state?: boolean;
+  element: boolean;
+  event: boolean;
+  listener: boolean;
+  method: boolean;
+  propConnect: boolean;
+  propContext: boolean;
+  propDidChange: boolean;
+  propWillChange: boolean;
 
   // lifecycle events
-  _build_did_load?: boolean;
-  _build_will_load?: boolean;
-  _build_did_update?: boolean;
-  _build_will_update?: boolean;
-  _build_did_unload?: boolean;
-  _build_will_unload?: boolean;
+  cmpDidLoad: boolean;
+  cmpWillLoad: boolean;
+  cmpDidUpdate: boolean;
+  cmpWillUpdate: boolean;
+  cmpDidUnload: boolean;
 }
 
 
@@ -534,7 +532,7 @@ export interface BuildContext {
   watcher?: FSWatcher;
   tsConfig?: any;
   hasIndexHtml?: boolean;
-  coreBuildConditionals?: CoreBuildConditionals;
+  buildConditionals?: BuildConditionals;
 
   isRebuild?: boolean;
   isChangeBuild?: boolean;
@@ -880,7 +878,7 @@ export interface HostElement extends HTMLElement {
   $connected?: boolean;
   $defaultHolder?: Comment;
   $initLoad: () => void;
-  $instance?: ComponentInstance;
+  _instance?: ComponentInstance;
   $rendered?: boolean;
   $onRender: (() => void)[];
   componentOnReady?: (cb?: (elm: HostElement) => void) => Promise<void>;

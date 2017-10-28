@@ -46,7 +46,7 @@ export function transpileFiles(config: BuildConfig, ctx: BuildContext, moduleFil
 }
 
 
-export function transpileModule(config: BuildConfig, ctx: BuildContext, input: string, compilerOptions?: any, path?: string) {
+export function transpileModule(config: BuildConfig, input: string, compilerOptions?: any, path?: string) {
   const fileMeta: ModuleFile = {
     tsFilePath: path || 'transpileModule.tsx'
   };
@@ -61,7 +61,7 @@ export function transpileModule(config: BuildConfig, ctx: BuildContext, input: s
     compilerOptions: compilerOptions,
     transformers: {
       before: [
-        componentModuleFileClass(config, ctx, fileMeta, diagnostics),
+        componentModuleFileClass(config, fileMeta, diagnostics),
         removeImports(),
         renameLifecycleMethods(),
         addMetadataExport(fileMeta)
@@ -161,7 +161,7 @@ function transpileModules(config: BuildConfig, ctx: BuildContext, moduleFiles: M
   // this is the big one, let's go ahead and kick off the transpiling
   program.emit(undefined, tsHost.writeFile, undefined, false, {
     before: [
-      componentTsFileClass(config, ctx, ctx.moduleFiles, ctx.diagnostics),
+      componentTsFileClass(config, ctx.moduleFiles, ctx.diagnostics),
       removeImports(),
       renameLifecycleMethods()
     ],
@@ -178,8 +178,10 @@ function transpileModules(config: BuildConfig, ctx: BuildContext, moduleFiles: M
 
   if (!config.suppressTypeScriptErrors) {
     // suppressTypeScriptErrors mainly for unit testing
-    const tsDiagnostics = program.getSyntacticDiagnostics()
-      .concat(program.getSemanticDiagnostics(), program.getOptionsDiagnostics());
+    const tsDiagnostics: ts.Diagnostic[] = [];
+    program.getSyntacticDiagnostics().forEach(d => tsDiagnostics.push(d));
+    program.getSemanticDiagnostics().forEach(d => tsDiagnostics.push(d));
+    program.getOptionsDiagnostics().forEach(d => tsDiagnostics.push(d));
 
     loadTypeScriptDiagnostics(config.rootDir, ctx.diagnostics, tsDiagnostics);
   }

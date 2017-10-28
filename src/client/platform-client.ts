@@ -1,10 +1,12 @@
 import { addEventListener, enableEventListener } from '../core/instance/listeners';
-import { assignHostContentSlots, createVNodesFromSsr } from '../core/renderer/slot';
+import { assignHostContentSlots } from '../core/renderer/slot';
 import { AppGlobal, BundleCallbacks, ComponentMeta, ComponentRegistry, CoreContext,
   EventEmitterData, HostElement, LoadComponentRegistry, PlatformApi } from '../util/interfaces';
+import { Build } from '../util/build-conditionals';
 import { createDomControllerClient } from './dom-controller-client';
 import { createDomApi } from '../core/renderer/dom-api';
 import { createRendererPatch } from '../core/renderer/patch';
+import { createVNodesFromSsr } from '../core/renderer/ssr';
 import { createQueueClient } from './queue-client';
 import { ENCAPSULATION, RUNTIME_ERROR, SSR_VNODE_ID } from '../util/constants';
 import { h, t } from '../core/renderer/h';
@@ -28,20 +30,24 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
   // initialize Core global object
   Context.dom = createDomControllerClient(win, now);
 
-  Context.addListener = (elm, eventName, cb, opts) => {
-    return addEventListener(plt, elm, eventName, cb, opts && opts.capture, opts && opts.passive);
-  };
+  if (Build.listener) {
+    Context.addListener = (elm, eventName, cb, opts) => {
+      return addEventListener(plt, elm, eventName, cb, opts && opts.capture, opts && opts.passive);
+    };
 
-  Context.enableListener = (instance, eventName, enabled, attachTo) => {
-    enableEventListener(plt, instance, eventName, enabled, attachTo);
-  };
+    Context.enableListener = (instance, eventName, enabled, attachTo) => {
+      enableEventListener(plt, instance, eventName, enabled, attachTo);
+    };
+  }
 
-  Context.emit = (elm: Element, eventName: string, data: EventEmitterData) => {
-    elm && elm.dispatchEvent(new WindowCustomEvent(
-      Context.eventNameFn ? Context.eventNameFn(eventName) : eventName,
-      data
-    ));
-  };
+  if (Build.event) {
+    Context.emit = (elm: Element, eventName: string, data: EventEmitterData) => {
+      elm && elm.dispatchEvent(new WindowCustomEvent(
+        Context.eventNameFn ? Context.eventNameFn(eventName) : eventName,
+        data
+      ));
+    };
+  }
 
   Context.isClient = true;
   Context.isServer = Context.isPrerender = false;
@@ -71,7 +77,7 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
     registerComponents,
   };
 
-  const supportsNativeShadowDom = !!(Element.prototype.attachShadow);
+  const supportsNativeShadowDom = (Build.shadowDom && !!(Element.prototype.attachShadow));
 
   // create the renderer that will be used
   plt.render = createRendererPatch(plt, domApi, supportsNativeShadowDom);
@@ -81,15 +87,16 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
   const rootElm = domApi.$documentElement as HostElement;
   rootElm.$rendered = true;
   rootElm.$activeLoading = [];
-  rootElm.$initLoad = () => {
-    // this will fire when all components have finished loaded
-    rootElm._hasLoaded = true;
-  };
+
+  // this will fire when all components have finished loaded
+  rootElm.$initLoad = () => rootElm._hasLoaded = true;
 
 
-  // if the HTML was generated from SSR
-  // then let's walk the tree and generate vnodes out of the data
-  createVNodesFromSsr(domApi, rootElm);
+  if (Build.ssrClientSide) {
+    // if the HTML was generated from SSR
+    // then let's walk the tree and generate vnodes out of the data
+    createVNodesFromSsr(domApi, rootElm);
+  }
 
 
   function getComponentMeta(elm: Element) {
@@ -108,14 +115,14 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
     }
 
     // host element has been connected to the DOM
-    if (!domApi.$getAttribute(elm, SSR_VNODE_ID) && !useShadowDom(supportsNativeShadowDom, cmpMeta)) {
-      // only required when we're not using native shadow dom (slot)
+    if (Build.customSlot && !domApi.$getAttribute(elm, SSR_VNODE_ID) && !useShadowDom(supportsNativeShadowDom, cmpMeta)) {
+      // only required when we're NOT using native shadow dom (slot)
       // this host element was NOT created with SSR
       // let's pick out the inner content for slot projection
       assignHostContentSlots(domApi, elm, cmpMeta.slotMeta);
     }
 
-    if (!supportsNativeShadowDom && cmpMeta.encapsulation === ENCAPSULATION.ShadowDom) {
+    if (Build.customSlot && !supportsNativeShadowDom && cmpMeta.encapsulation === ENCAPSULATION.ShadowDom) {
       // this component should use shadow dom
       // but this browser doesn't support it
       // so let's polyfill a few things for the user
@@ -141,28 +148,30 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
       // initialize the members on the host element prototype
       initHostConstructor(plt, cmpMeta, HostElementConstructor.prototype, hydratedCssClass);
 
-      // add which attributes should be observed
-      const observedAttributes: string[] = [];
+      if (Build.observeAttr) {
+        // add which attributes should be observed
+        const observedAttributes: string[] = [];
 
-      // at this point the membersMeta only includes attributes which should
-      // be observed, it does not include all props yet, so it's safe to
-      // loop through all of the props (attrs) and observed them
-      for (var propName in cmpMeta.membersMeta) {
-        // initialize the actual attribute name used vs. the prop name
-        // for example, "myProp" would be "my-prop" as an attribute
-        // and these can be configured to be all lower case or dash case (default)
-        if (cmpMeta.membersMeta[propName].attribName) {
-          observedAttributes.push(
-            // dynamically generate the attribute name from the prop name
-            // also add it to our array of attributes we need to observe
-            cmpMeta.membersMeta[propName].attribName
-          );
+        // at this point the membersMeta only includes attributes which should
+        // be observed, it does not include all props yet, so it's safe to
+        // loop through all of the props (attrs) and observed them
+        for (var propName in cmpMeta.membersMeta) {
+          // initialize the actual attribute name used vs. the prop name
+          // for example, "myProp" would be "my-prop" as an attribute
+          // and these can be configured to be all lower case or dash case (default)
+          if (cmpMeta.membersMeta[propName].attribName) {
+            observedAttributes.push(
+              // dynamically generate the attribute name from the prop name
+              // also add it to our array of attributes we need to observe
+              cmpMeta.membersMeta[propName].attribName
+            );
+          }
         }
-      }
 
-      // set the array of all the attributes to keep an eye on
-      // https://www.youtube.com/watch?v=RBs21CFBALI
-      HostElementConstructor.observedAttributes = observedAttributes;
+        // set the array of all the attributes to keep an eye on
+        // https://www.youtube.com/watch?v=RBs21CFBALI
+        HostElementConstructor.observedAttributes = observedAttributes;
+      }
 
       // define the custom element
       win.customElements.define(tagName, HostElementConstructor);
@@ -196,7 +205,7 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
       for (i = 0; i < callbacks.length; i++) {
         callbacks[i]();
       }
-      delete bundleCallbacks[bundleId];
+      bundleCallbacks[bundleId] = null;
     }
 
     // remember that we've already loaded this bundle
@@ -204,31 +213,33 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
   };
 
 
-  App.loadStyles = function loadStyles() {
-    // jsonp callback from requested bundles
-    // either directly add styles to document.head or add the
-    // styles to a template tag to be cloned later for shadow roots
-    const args = arguments;
-    let templateElm: HTMLTemplateElement;
+  if (Build.styles) {
+    App.loadStyles = function loadStyles() {
+      // jsonp callback from requested bundles
+      // either directly add styles to document.head or add the
+      // styles to a template tag to be cloned later for shadow roots
+      const args = arguments;
+      let templateElm: HTMLTemplateElement;
 
-    for (var i = 0; i < args.length; i += 2) {
-      // create the template element which will hold the styles
-      // adding it to the dom via <template> so that we can
-      // clone this for each potential shadow root that will need these styles
-      // otherwise it'll be cloned and added to the entire document
-      // but that's for the renderer to figure out later
-      styleTemplates[args[i]] = templateElm = domApi.$createElement('template');
+      for (var i = 0; i < args.length; i += 2) {
+        // create the template element which will hold the styles
+        // adding it to the dom via <template> so that we can
+        // clone this for each potential shadow root that will need these styles
+        // otherwise it'll be cloned and added to the entire document
+        // but that's for the renderer to figure out later
+        styleTemplates[args[i]] = templateElm = domApi.$createElement('template');
 
-      // add the style text to the template element
-      templateElm.innerHTML = `<style>${args[i + 1]}</style>`;
+        // add the style text to the template element
+        templateElm.innerHTML = `<style>${args[i + 1]}</style>`;
 
-      // give it an unique id
-      templateElm.id = `tmp-${args[i]}`;
+        // give it an unique id
+        templateElm.id = `tmp-${args[i]}`;
 
-      // add our new element to the head
-      domApi.$appendChild(domApi.$head, templateElm);
-    }
-  };
+        // add our new element to the head
+        domApi.$appendChild(domApi.$head, templateElm);
+      }
+    };
+  }
 
 
   function loadBundle(cmpMeta: ComponentMeta, elm: HostElement, cb: Function): void {
@@ -251,7 +262,7 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
 
   function requestBundle(cmpMeta: ComponentMeta, bundleId: string) {
     // create the url we'll be requesting
-    const url = publicPath + bundleId + ((useScopedCss(supportsNativeShadowDom, cmpMeta) ? '.sc' : '') + '.js');
+    const url = publicPath + bundleId + ((Build.scopedCss && (useScopedCss(supportsNativeShadowDom, cmpMeta)) ? '.sc' : '') + '.js');
 
     if (pendingBundleRequests[url]) {
       // we're already actively requesting this url
@@ -275,10 +286,10 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
     function onScriptComplete() {
       clearTimeout(tmrId);
       scriptElm.onerror = scriptElm.onload = null;
-      domApi.$removeChild(scriptElm.parentNode, scriptElm);
+      domApi.$removeChild(domApi.$parentNode(scriptElm), scriptElm);
 
       // remove from our list of active requests
-      delete pendingBundleRequests[url];
+      pendingBundleRequests[url] = false;
     }
 
     // add script completed listener to this script element
@@ -291,69 +302,78 @@ export function createPlatformClient(Context: CoreContext, App: AppGlobal, win: 
 
 
   function attachStyles(cmpMeta: ComponentMeta, modeName: string, elm: HostElement) {
-    const templateElm = styleTemplates[cmpMeta.tagNameMeta + '_' + modeName] || styleTemplates[cmpMeta.tagNameMeta];
+    if (Build.styles) {
+      const templateElm = styleTemplates[cmpMeta.tagNameMeta + '_' + modeName] || styleTemplates[cmpMeta.tagNameMeta];
 
-    if (templateElm) {
-      let styleContainerNode: HTMLElement = domApi.$head;
+      if (templateElm) {
+        let styleContainerNode: HTMLElement = domApi.$head;
 
-      if (supportsNativeShadowDom) {
-        if (cmpMeta.encapsulation === ENCAPSULATION.ShadowDom) {
-          styleContainerNode = (elm.shadowRoot as any);
+        if (supportsNativeShadowDom) {
+          if (cmpMeta.encapsulation === ENCAPSULATION.ShadowDom) {
+            styleContainerNode = (elm.shadowRoot as any);
 
-        } else {
-          while ((elm as Node) = domApi.$parentNode(elm)) {
-            if ((elm as any).host && (elm as any).host.shadowRoot) {
-              styleContainerNode = (elm as any).host.shadowRoot;
-              break;
+          } else {
+            while ((elm as Node) = domApi.$parentNode(elm)) {
+              if ((elm as any).host && (elm as any).host.shadowRoot) {
+                styleContainerNode = (elm as any).host.shadowRoot;
+                break;
+              }
             }
           }
         }
-      }
 
-      const appliedStyles = ((styleContainerNode as HostElement)._appliedStyles = (styleContainerNode as HostElement)._appliedStyles || {});
+        const appliedStyles = ((styleContainerNode as HostElement)._appliedStyles = (styleContainerNode as HostElement)._appliedStyles || {});
 
-      if (!appliedStyles[templateElm.id]) {
-        // we haven't added these styles to this element yet
-        const styleElm = templateElm.content.cloneNode(true) as HTMLStyleElement;
+        if (!appliedStyles[templateElm.id]) {
+          // we haven't added these styles to this element yet
+          const styleElm = templateElm.content.cloneNode(true) as HTMLStyleElement;
 
-        const insertReferenceNode = styleContainerNode.querySelector('[data-visibility]');
-        domApi.$insertBefore(styleContainerNode, styleElm, (insertReferenceNode && insertReferenceNode.nextSibling) || styleContainerNode.firstChild);
+          const insertReferenceNode = styleContainerNode.querySelector('[data-visibility]');
+          domApi.$insertBefore(styleContainerNode, styleElm, (insertReferenceNode && insertReferenceNode.nextSibling) || styleContainerNode.firstChild);
 
-        // remember we don't need to do this again for this element
-        appliedStyles[templateElm.id] = true;
+          // remember we don't need to do this again for this element
+          appliedStyles[templateElm.id] = true;
+        }
       }
     }
   }
 
 
-  var WindowCustomEvent = (win as any).CustomEvent;
-  if (typeof WindowCustomEvent !== 'function') {
-    // CustomEvent polyfill
-    WindowCustomEvent = (event: any, data: EventEmitterData) => {
-      var evt = domApi.$createEvent();
-      evt.initCustomEvent(event, data.bubbles, data.cancelable, data.detail);
-      return evt;
-    };
-    WindowCustomEvent.prototype = (win as any).Event.prototype;
+  if (Build.event) {
+    var WindowCustomEvent = (win as any).CustomEvent;
+    if (typeof WindowCustomEvent !== 'function') {
+      // CustomEvent polyfill
+      WindowCustomEvent = (event: any, data: EventEmitterData) => {
+        var evt = domApi.$createEvent();
+        evt.initCustomEvent(event, data.bubbles, data.cancelable, data.detail);
+        return evt;
+      };
+      WindowCustomEvent.prototype = (win as any).Event.prototype;
+    }
+
+    // test if this browser supports event options or not
+    var supportsEventOptions = false;
+    try {
+      win.addEventListener('eopt', null,
+        Object.defineProperty({}, 'passive', {
+          get: () => {
+            supportsEventOptions = true;
+          }
+        })
+      );
+    } catch (e) {}
   }
 
-  // test if this browser supports event options or not
-  var supportsEventOptions = false;
-  try {
-    win.addEventListener('eopt', null,
-      Object.defineProperty({}, 'passive', {
-        get: () => {
-          supportsEventOptions = true;
-        }
-      })
-    );
-  } catch (e) {}
-
   function getEventOptions(useCapture: boolean, usePassive: boolean) {
-    return supportsEventOptions ? {
+    if (Build.event) {
+      return supportsEventOptions ? {
         capture: !!useCapture,
         passive: !!usePassive
       } : !!useCapture;
+
+    } else {
+      return false;
+    }
   }
 
   function onError(err: Error, type: RUNTIME_ERROR, elm: HostElement) {

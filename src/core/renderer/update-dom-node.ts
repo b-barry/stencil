@@ -1,28 +1,29 @@
 import { addEventListener } from '../instance/listeners';
+import { Build } from '../../util/build-conditionals';
 import { EMPTY_ARR, EMPTY_OBJ, NODE_TYPE } from '../../util/constants';
 import { PlatformApi, VNode } from '../../util/interfaces';
 import { toLowerCase } from '../../util/helpers';
 
 
-export function updateElement(plt: PlatformApi, oldVnode: VNode | null, newVnode: VNode, isSvgMode: boolean, propName?: string): void {
+export function updateElement(plt: PlatformApi, oldVnode: VNode | null, newVnode: VNode, isSvgMode: boolean, name?: string): void {
   // if the element passed in is a shadow root, which is a document fragment
   // then we want to be adding attrs/props to the shadow root's "host" element
   // if it's not a shadow root, then we add attrs/props to the same element
-  const elm = (newVnode.elm.nodeType === NODE_TYPE.DocumentFragment && (newVnode.elm as ShadowRoot).host) ? (newVnode.elm as ShadowRoot).host : (newVnode.elm as any);
+  const elm = (Build.shadowDom && newVnode.elm.nodeType === NODE_TYPE.DocumentFragment && (newVnode.elm as ShadowRoot).host) ? (newVnode.elm as ShadowRoot).host : (newVnode.elm as any);
   const oldVnodeAttrs = (oldVnode && oldVnode.vattrs) || EMPTY_OBJ;
   const newVnodeAttrs = newVnode.vattrs || EMPTY_OBJ;
 
   // remove attributes no longer present on the vnode by setting them to undefined
-  for (propName in oldVnodeAttrs) {
-    if (!(newVnodeAttrs && newVnodeAttrs[propName] != null) && oldVnodeAttrs[propName] != null) {
-      setAccessor(plt, elm, propName, oldVnodeAttrs[propName], undefined, isSvgMode);
+  for (name in oldVnodeAttrs) {
+    if (!(newVnodeAttrs && newVnodeAttrs[name] != null) && oldVnodeAttrs[name] != null) {
+      setAccessor(plt, elm, name, oldVnodeAttrs[name], undefined, isSvgMode);
     }
   }
 
   // add new & update changed attributes
-  for (propName in newVnodeAttrs) {
-    if (!(propName in oldVnodeAttrs) || newVnodeAttrs[propName] !== (propName === 'value' || propName === 'checked' ? elm[propName] : oldVnodeAttrs[propName])) {
-      setAccessor(plt, elm, propName, oldVnodeAttrs[propName], newVnodeAttrs[propName], isSvgMode);
+  for (name in newVnodeAttrs) {
+    if (!(name in oldVnodeAttrs) || newVnodeAttrs[name] !== (name === 'value' || name === 'checked' ? elm[name] : oldVnodeAttrs[name])) {
+      setAccessor(plt, elm, name, oldVnodeAttrs[name], newVnodeAttrs[name], isSvgMode);
     }
   }
 }
@@ -69,7 +70,7 @@ export function setAccessor(plt: PlatformApi, elm: any, name: string, oldValue: 
       }
     }
 
-  } else if (name[0] === 'o' && name[1] === 'n' && (!(name in elm))) {
+  } else if (Build.listener && name[0] === 'o' && name[1] === 'n' && (!(name in elm))) {
     // Event Handlers
     // adding an standard event listener, like <button onClick=...> or something
 

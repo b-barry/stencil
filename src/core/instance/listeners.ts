@@ -35,9 +35,9 @@ export function createListenerCallback(elm: HostElement, eventMethodName: string
   // create the function that gets called when the element receives
   // an event which it should be listening for
   return (ev?: any) => {
-    if (elm.$instance) {
+    if (elm._instance) {
       // instance is ready, let's call it's member method for this event
-      elm.$instance[eventMethodName](ev);
+      elm._instance[eventMethodName](ev);
 
     } else {
       // instance is not ready!!
@@ -49,7 +49,7 @@ export function createListenerCallback(elm: HostElement, eventMethodName: string
 }
 
 
-export function replayQueuedEventsOnInstance(elm: HostElement) {
+export function replayQueuedEventsOnInstance(elm: HostElement, i?: number) {
   // the element has an instance now and
   // we already added the event listeners to the element
   const queuedEvents = elm._queuedEvents;
@@ -58,16 +58,16 @@ export function replayQueuedEventsOnInstance(elm: HostElement) {
     // events may have already fired before the instance was even ready
     // now that the instance is ready, let's replay all of the events that
     // we queued up earlier that were originally meant for the instance
-    for (var i = 0; i < queuedEvents.length; i += 2) {
+    for (i = 0; i < queuedEvents.length; i += 2) {
       // data was added in sets of two
       // first item the eventMethodName
       // second item is the event data
       // take a look at initElementListener()
-      elm.$instance[queuedEvents[i]](queuedEvents[i + 1]);
+      elm._instance[queuedEvents[i]](queuedEvents[i + 1]);
     }
 
     // no longer need this data, be gone with you
-    delete elm._queuedEvents;
+    elm._queuedEvents = null;
   }
 }
 
@@ -105,7 +105,7 @@ export function enableEventListener(plt: PlatformApi, instance: ComponentInstanc
 
           } else if (!shouldEnable && fn) {
             deregisterFns[eventName]();
-            delete deregisterFns[eventName];
+            deregisterFns[eventName] = null;
           }
           return true;
         }

@@ -1,8 +1,8 @@
-import { CoreBuildConditionals } from '../../../util/interfaces';
+import { BuildConditionals } from '../../../util/interfaces';
 import * as ts from 'typescript';
 
 
-export function coreBuildConditionalsTransform(coreBuild: CoreBuildConditionals): ts.TransformerFactory<ts.SourceFile> {
+export function buildConditionalsTransform(coreBuild: BuildConditionals): ts.TransformerFactory<ts.SourceFile> {
 
   return (transformContext) => {
     function visitIdentifier(node: ts.Identifier) {

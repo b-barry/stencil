@@ -1,3 +1,4 @@
+import { Build } from '../../util/build-conditionals';
 import { ComponentMeta, HostElement, PlatformApi } from '../../util/interfaces';
 import { getParentElement } from '../../util/helpers';
 import { initElementListeners } from './listeners';
@@ -13,12 +14,14 @@ export function connectedCallback(plt: PlatformApi, cmpMeta: ComponentMeta, elm:
     elm.$connected = true;
 
     // if somehow this node was reused, ensure we've removed this property
-    delete elm._hasDestroyed;
+    elm._hasDestroyed = null;
 
-    // initialize our event listeners on the host element
-    // we do this now so that we can listening to events that may
-    // have fired even before the instance is ready
-    initElementListeners(plt, elm);
+    if (Build.event) {
+      // initialize our event listeners on the host element
+      // we do this now so that we can listening to events that may
+      // have fired even before the instance is ready
+      initElementListeners(plt, elm);
+    }
 
     // register this component as an actively
     // loading child to its parent component

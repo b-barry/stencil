@@ -379,7 +379,7 @@ export function mockComponentInstance(plt: PlatformApi, domApi: DomApi, cmpMeta:
 
   const el = domApi.$createElement('ion-cmp') as any;
   initComponentInstance(plt, el);
-  return el.$instance;
+  return el._instance;
 }
 
 export function mockTextNode(text: string): Element {
@@ -411,8 +411,8 @@ export function mockEvent(domApi: DomApi, name: string, detail: any = {}): Custo
 }
 
 export function mockDispatchEvent(domApi: DomApi, el: HTMLElement, name: string, detail: any = {}): boolean {
-  const event = mockEvent(domApi, name, detail);
-  return el.dispatchEvent(event);
+  const ev = mockEvent(domApi, name, detail);
+  return el.dispatchEvent(ev);
 }
 
 export function mockConnect(plt: MockedPlatform, html: string) {

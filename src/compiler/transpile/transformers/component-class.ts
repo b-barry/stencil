@@ -1,4 +1,4 @@
-import { BuildConfig, BuildContext, Diagnostic, ModuleFiles, ModuleFile } from '../../../util/interfaces';
+import { BuildConfig, Diagnostic, ModuleFiles, ModuleFile } from '../../../util/interfaces';
 import { buildError } from '../../util';
 import { getComponentDecoratorData } from './component-decorator';
 import { getElementDecoratorMeta } from './element-decorator';
@@ -8,12 +8,11 @@ import { getMethodDecoratorMeta } from './method-decorator';
 import { getPropDecoratorMeta } from './prop-decorator';
 import { getPropChangeDecoratorMeta } from './prop-change-decorator';
 import { getStateDecoratorMeta } from './state-decorator';
-import { loadComponentBuildSections } from './component-build-sections';
 import { updateComponentClass } from './util';
 import * as ts from 'typescript';
 
 
-export function componentModuleFileClass(config: BuildConfig, ctx: BuildContext, fileMeta: ModuleFile, diagnostics: Diagnostic[]): ts.TransformerFactory<ts.SourceFile> {
+export function componentModuleFileClass(config: BuildConfig, fileMeta: ModuleFile, diagnostics: Diagnostic[]): ts.TransformerFactory<ts.SourceFile> {
 
   return (transformContext) => {
 
@@ -21,7 +20,7 @@ export function componentModuleFileClass(config: BuildConfig, ctx: BuildContext,
       switch (node.kind) {
 
         case ts.SyntaxKind.ClassDeclaration:
-          return visitClass(config, ctx, fileMeta, diagnostics, node as ts.ClassDeclaration);
+          return visitClass(config, fileMeta, diagnostics, node as ts.ClassDeclaration);
 
         default:
           return ts.visitEachChild(node, (node) => {
@@ -29,7 +28,6 @@ export function componentModuleFileClass(config: BuildConfig, ctx: BuildContext,
           }, transformContext);
       }
     }
-
 
     return (tsSourceFile) => {
       return visit(fileMeta, tsSourceFile) as ts.SourceFile;
@@ -39,7 +37,7 @@ export function componentModuleFileClass(config: BuildConfig, ctx: BuildContext,
 }
 
 
-export function componentTsFileClass(config: BuildConfig, ctx: BuildContext, moduleFiles: ModuleFiles, diagnostics: Diagnostic[]): ts.TransformerFactory<ts.SourceFile> {
+export function componentTsFileClass(config: BuildConfig, moduleFiles: ModuleFiles, diagnostics: Diagnostic[]): ts.TransformerFactory<ts.SourceFile> {
 
   return (transformContext) => {
 
@@ -47,7 +45,7 @@ export function componentTsFileClass(config: BuildConfig, ctx: BuildContext, mod
       switch (node.kind) {
 
         case ts.SyntaxKind.ClassDeclaration:
-          return visitClass(config, ctx, fileMeta, diagnostics, node as ts.ClassDeclaration);
+          return visitClass(config, fileMeta, diagnostics, node as ts.ClassDeclaration);
 
         default:
           return ts.visitEachChild(node, (node) => {
@@ -72,7 +70,7 @@ export function componentTsFileClass(config: BuildConfig, ctx: BuildContext, mod
 
 
 
-function visitClass(config: BuildConfig, ctx: BuildContext, moduleFile: ModuleFile, diagnostics: Diagnostic[], classNode: ts.ClassDeclaration) {
+function visitClass(config: BuildConfig, moduleFile: ModuleFile, diagnostics: Diagnostic[], classNode: ts.ClassDeclaration) {
   const cmpMeta = getComponentDecoratorData(config, moduleFile, diagnostics, classNode);
 
   if (!cmpMeta) {
@@ -101,11 +99,6 @@ function visitClass(config: BuildConfig, ctx: BuildContext, moduleFile: ModuleFi
     listenersMeta: getListenDecoratorMeta(moduleFile.tsFilePath, diagnostics, classNode),
     ...getPropChangeDecoratorMeta(classNode)
   };
-
-  // figure out all the build sections that we'll need
-  // by parsing apart the user's components and figuring
-  // out what features they will and will not need in the core
-  loadComponentBuildSections(ctx, classNode);
 
   // Return Class Declaration with Decorator removed and as default export
   return updateComponentClass(classNode);

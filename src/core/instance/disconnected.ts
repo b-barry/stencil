@@ -1,13 +1,13 @@
 import { callNodeRefs } from '../renderer/patch';
 import { detachListeners } from './listeners';
-import { HostElement, PlatformApi } from '../../util/interfaces';
+import { DomApi, HostElement, PlatformApi } from '../../util/interfaces';
 import { propagateElementLoaded } from './init-component';
 
 
 export function disconnectedCallback(plt: PlatformApi, elm: HostElement) {
   // only disconnect if we're not temporarily disconnected
   // tmpDisconnected will happen when slot nodes are being relocated
-  if (!plt.tmpDisconnected && isDisconnected(elm)) {
+  if (!plt.tmpDisconnected && isDisconnected(plt.domApi, elm)) {
 
     // ok, let's officially destroy this thing
     // set this to true so that any of our pending async stuff
@@ -31,11 +31,11 @@ export function disconnectedCallback(plt: PlatformApi, elm: HostElement) {
 
     // call instance Did Unload and destroy instance stuff
     // if we've created an instance for this
-    const instance = elm.$instance;
-    if (instance) {
+    const instance = elm._instance;
+    if (elm._instance) {
       // call the user's componentDidUnload if there is one
       instance.componentDidUnload && instance.componentDidUnload();
-      elm.$instance = instance.__el = null;
+      elm._instance = instance.__el = null;
     }
 
     // fuhgeddaboudit
@@ -47,12 +47,11 @@ export function disconnectedCallback(plt: PlatformApi, elm: HostElement) {
 }
 
 
-function isDisconnected(elm: HTMLElement) {
+function isDisconnected(domApi: DomApi, elm: Node): any {
   while (elm) {
-    if (elm.parentElement === null) {
-      return elm.tagName !== 'HTML';
+    if (!domApi.$parentNode(elm)) {
+      return domApi.$tagName(elm) !== 'html';
     }
-    elm = elm.parentElement;
+    elm = domApi.$parentNode(elm);
   }
-  return false;
 }

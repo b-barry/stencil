@@ -1,10 +1,10 @@
-import { CoreBuildConditionals, Diagnostic, TranspileResults } from '../../util/interfaces';
-import { coreBuildConditionalsTransform } from './transformers/core-build-conditionals';
+import { BuildConditionals, Diagnostic, TranspileResults } from '../../util/interfaces';
+import { buildConditionalsTransform } from './transformers/build-conditionals';
 import { loadTypeScriptDiagnostics } from '../../util/logger/logger-typescript';
 import * as ts from 'typescript';
 
 
-export function transpileCoreBuild(coreBuild: CoreBuildConditionals, input: string) {
+export function transpileCoreBuild(coreBuild: BuildConditionals, input: string) {
   const diagnostics: Diagnostic[] = [];
   const results: TranspileResults = {
     code: null,
@@ -15,7 +15,7 @@ export function transpileCoreBuild(coreBuild: CoreBuildConditionals, input: stri
     compilerOptions: getCompilerOptions(coreBuild),
     transformers: {
       before: [
-        coreBuildConditionalsTransform(coreBuild)
+        buildConditionalsTransform(coreBuild)
       ]
     }
   };
@@ -36,15 +36,15 @@ export function transpileCoreBuild(coreBuild: CoreBuildConditionals, input: stri
 }
 
 
-function getCompilerOptions(coreBuild: CoreBuildConditionals) {
+function getCompilerOptions(coreBuild: BuildConditionals) {
   const opts: ts.CompilerOptions = {
     allowJs: true
   };
 
-  if (coreBuild._build_es2015) {
+  if (coreBuild.es2015) {
     opts.target = ts.ScriptTarget.ES2015;
 
-  } else if (coreBuild._build_es5) {
+  } else if (coreBuild.es5) {
     opts.target = ts.ScriptTarget.ES5;
   }
 

@@ -1,8 +1,8 @@
-import { BuildConfig, BuildContext, CoreBuildConditionals } from '../../util/interfaces';
+import { BuildConfig, BuildContext, BuildConditionals } from '../../util/interfaces';
 import { transpileCoreBuild } from '../transpile/core-build';
 
 
-export function buildCoreContent(config: BuildConfig, ctx: BuildContext, coreBuild: CoreBuildConditionals, coreContent: string) {
+export function buildCoreContent(config: BuildConfig, ctx: BuildContext, coreBuild: BuildConditionals, coreContent: string) {
   const transpileResults = transpileCoreBuild(coreBuild, coreContent);
 
   if (transpileResults.diagnostics && transpileResults.diagnostics.length) {
@@ -23,13 +23,13 @@ export function buildCoreContent(config: BuildConfig, ctx: BuildContext, coreBui
 }
 
 
-function minifyCore(config: BuildConfig, coreBuild: CoreBuildConditionals, input: string) {
+function minifyCore(config: BuildConfig, coreBuild: BuildConditionals, input: string) {
   const opts: any = Object.assign({}, config.minifyJs ? PROD_MINIFY_OPTS : DEV_MINIFY_OPTS);
 
   opts.ecma = 5;
 
   if (config.minifyJs) {
-    if (coreBuild._build_es2015) {
+    if (coreBuild.es2015) {
       opts.ecma = 6;
       opts.compress.unsafe_arrows = true;
       opts.compress.unsafe_methods = true;
@@ -43,12 +43,13 @@ function minifyCore(config: BuildConfig, coreBuild: CoreBuildConditionals, input
       // properties originally were named
       opts.mangle.properties.debug = true;
       opts.mangle.keep_fnames = true;
+      opts.compress.drop_console = false;
+      opts.compress.drop_debugger = false;
       opts.output.beautify = true;
       opts.output.bracketize = true;
       opts.output.indent_level = 2;
+      opts.output.comments = 'all';
       opts.output.preserve_line = true;
-      opts.compress.drop_console = false;
-      opts.compress.drop_debugger = false;
     }
   }
 

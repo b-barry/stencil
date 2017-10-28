@@ -6,11 +6,7 @@ export function createDomControllerClient(win: Window, now: Now): DomController 
   const writeCBs: RafCallback[] = [];
   let rafPending = false;
 
-
-  function raf(cb: FrameRequestCallback): number {
-    return win.requestAnimationFrame(cb);
-  }
-
+  const raf = (cb: FrameRequestCallback): number => win.requestAnimationFrame(cb);
 
   function rafFlush(timeStamp: number, startTime?: number, cb?: RafCallback, err?: any) {
     try {

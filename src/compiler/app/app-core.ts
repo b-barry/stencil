@@ -1,18 +1,18 @@
-import { BuildConfig, BuildContext, CoreBuildConditionals } from '../../util/interfaces';
+import { BuildConfig, BuildContext, BuildConditionals } from '../../util/interfaces';
 import { buildCoreContent } from './build-core-content';
 import { generatePreamble, normalizePath } from '../util';
 import { getAppFileName } from './generate-app-files';
-import { setCoreBuildConditionals } from './core-conditionals';
+import { setBuildConditionals } from './core-conditionals';
 
 
 export function generateCore(config: BuildConfig, ctx: BuildContext, globalJsContent: string[]) {
   const staticName = 'core.build.js';
 
   // figure out which sections should be included
-  setCoreBuildConditionals(ctx.coreBuildConditionals, ctx.manifestBundles);
+  ctx.buildConditionals = setBuildConditionals(config, ctx, ctx.manifestBundles);
 
   // create a list of builds we need to do
-  const coreBuilds = getCoreBuilds(ctx.coreBuildConditionals);
+  const coreBuilds = getCoreBuilds(ctx.buildConditionals);
 
   return Promise.all([
     config.sys.getClientCoreFile({ staticName: staticName }),
@@ -35,7 +35,7 @@ export function generateCore(config: BuildConfig, ctx: BuildContext, globalJsCon
 }
 
 
-function generateCoreBuild(config: BuildConfig, ctx: BuildContext, coreBuild: CoreBuildConditionals, globalJsContent: string[], coreContent: string, polyfillsContent: string) {
+function generateCoreBuild(config: BuildConfig, ctx: BuildContext, coreBuild: BuildConditionals, globalJsContent: string[], coreContent: string, polyfillsContent: string) {
   // mega-minify the core w/ property renaming, but not the user's globals
   // hardcode which features should and should not go in the core builds
   // process the transpiled code by removing unused code and minify when configured to do so
@@ -58,7 +58,7 @@ function generateCoreBuild(config: BuildConfig, ctx: BuildContext, coreBuild: Co
     }
 
     // concat the global js and transpiled code together
-    jsContent = `${globalContent};\n${jsContent}`;
+    jsContent = `${globalContent}\n${jsContent}`;
   }
 
   // wrap the core js code together
@@ -126,8 +126,8 @@ export function wrapCoreJs(config: BuildConfig, jsContent: string) {
 }
 
 
-function getCoreBuilds(coreBuild: CoreBuildConditionals) {
-  const coreBuilds: CoreBuildConditionals[] = [];
+function getCoreBuilds(coreBuild: BuildConditionals) {
+  const coreBuilds: BuildConditionals[] = [];
 
   // no custom slot
   // without ssr parser
@@ -135,7 +135,7 @@ function getCoreBuilds(coreBuild: CoreBuildConditionals) {
   coreBuilds.push({
     ...coreBuild,
     coreId: 'core',
-    _build_es2015: true
+    es2015: true
   });
 
   // no custom slot
@@ -144,17 +144,17 @@ function getCoreBuilds(coreBuild: CoreBuildConditionals) {
   coreBuilds.push({
     ...coreBuild,
     coreId: 'core.ssr',
-    _build_es2015: true,
-    _build_ssr_parser: true
+    es2015: true,
+    ssrClientSide: true
   });
 
   // es5 gets everything
   coreBuilds.push({
     ...coreBuild,
     coreId: 'core.pf',
-    _build_es5: true,
-    _build_custom_slot: true,
-    _build_ssr_parser: true,
+    es5: true,
+    customSlot: true,
+    ssrClientSide: true,
     polyfills: true
   });
 

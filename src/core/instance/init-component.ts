@@ -1,3 +1,4 @@
+import { Build } from '../../util/build-conditionals';
 import { callNodeRefs } from '../renderer/patch';
 import { ComponentInstance, HostElement, PlatformApi } from '../../util/interfaces';
 import { initEventEmitters } from './events';
@@ -10,7 +11,7 @@ export function initComponentInstance(plt: PlatformApi, elm: HostElement) {
   try {
     // using the user's component class, let's create a new instance
     const cmpMeta = plt.getComponentMeta(elm);
-    const instance: ComponentInstance = elm.$instance = new cmpMeta.componentModule();
+    const instance: ComponentInstance = elm._instance = new cmpMeta.componentModule();
 
     // ok cool, we've got an host element now, and a actual instance
     // and there were no errors creating the instance
@@ -19,25 +20,29 @@ export function initComponentInstance(plt: PlatformApi, elm: HostElement) {
     // and let the getters/setters do their jobs
     proxyComponentInstance(plt, cmpMeta, elm, instance);
 
-    // add each of the event emitters which wire up instance methods
-    // to fire off dom events from the host element
-    initEventEmitters(plt, cmpMeta.eventsMeta, instance);
+    if (Build.event) {
+      // add each of the event emitters which wire up instance methods
+      // to fire off dom events from the host element
+      initEventEmitters(plt, cmpMeta.eventsMeta, instance);
+    }
 
-    try {
-      // replay any event listeners on the instance that
-      // were queued up between the time the element was
-      // connected and before the instance was ready
-      replayQueuedEventsOnInstance(elm);
+    if (Build.listener) {
+      try {
+        // replay any event listeners on the instance that
+        // were queued up between the time the element was
+        // connected and before the instance was ready
+        replayQueuedEventsOnInstance(elm);
 
-    } catch (e) {
-      plt.onError(e, RUNTIME_ERROR.QueueEventsError, elm);
+      } catch (e) {
+        plt.onError(e, RUNTIME_ERROR.QueueEventsError, elm);
+      }
     }
 
   } catch (e) {
     // something done went wrong trying to create a component instance
     // create a dumby instance so other stuff can load
     // but chances are the app isn't fully working cuz this component has issues
-    elm.$instance = {};
+    elm._instance = {};
     plt.onError(e, RUNTIME_ERROR.InitInstanceError, elm, true);
   }
 }
@@ -45,7 +50,7 @@ export function initComponentInstance(plt: PlatformApi, elm: HostElement) {
 
 export function initLoad(plt: PlatformApi, elm: HostElement, hydratedCssClass?: string): any {
   // all is good, this component has been told it's time to finish loading
-  const instance = elm.$instance;
+  const instance = elm._instance;
 
   // it's possible that we've already decided to destroy this element
   // check if this element has any actively loading child elements
@@ -65,14 +70,16 @@ export function initLoad(plt: PlatformApi, elm: HostElement, hydratedCssClass?: 
       // put directly on the element (well before anything was ready)
       if (elm._onReadyCallbacks) {
         elm._onReadyCallbacks.forEach(cb => cb(elm));
-        delete elm._onReadyCallbacks;
+        elm._onReadyCallbacks = null;
       }
 
-      // fire off the user's componentDidLoad method (if one was provided)
-      // componentDidLoad only runs ONCE, after the instance's element has been
-      // assigned as the host element, and AFTER render() has been called
-      // we'll also fire this method off on the element, just to
-      instance.componentDidLoad && instance.componentDidLoad();
+      if (Build.cmpDidLoad) {
+        // fire off the user's componentDidLoad method (if one was provided)
+        // componentDidLoad only runs ONCE, after the instance's element has been
+        // assigned as the host element, and AFTER render() has been called
+        // we'll also fire this method off on the element, just to
+        instance.componentDidLoad && instance.componentDidLoad();
+      }
 
       // fire off the ref if it exists
       callNodeRefs(elm._vnode);
@@ -95,7 +102,7 @@ export function initLoad(plt: PlatformApi, elm: HostElement, hydratedCssClass?: 
 }
 
 
-export function propagateElementLoaded(elm: HostElement) {
+export function propagateElementLoaded(elm: HostElement, index?: number) {
   // load events fire from bottom to top
   // the deepest elements load first then bubbles up
   if (elm._ancestorHostElement) {
@@ -105,7 +112,7 @@ export function propagateElementLoaded(elm: HostElement) {
     const ancestorsActivelyLoadingChildren = elm._ancestorHostElement.$activeLoading;
 
     if (ancestorsActivelyLoadingChildren) {
-      let index = ancestorsActivelyLoadingChildren.indexOf(elm);
+      index = ancestorsActivelyLoadingChildren.indexOf(elm);
       if (index > -1) {
         // yup, this element is in the list of child elements to wait on
         // remove it so we can work to get the length down to 0
@@ -120,6 +127,6 @@ export function propagateElementLoaded(elm: HostElement) {
     }
 
     // fuhgeddaboudit, no need to keep a reference after this element loaded
-    delete elm._ancestorHostElement;
+    elm._ancestorHostElement = null;
   }
 }
